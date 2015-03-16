@@ -1,3 +1,5 @@
+Bold = require('./Bold.coffee')
+
 module.exports = class Section
 	constructor: (text) ->
 		@element = document.createElement(@tag)
@@ -12,9 +14,6 @@ module.exports = class Section
 		#if the previous char was &nbsp; and this one isn't turn the previous into a normal space
 		pre = @content.substring(0, start)
 		post = @content.substring(start + len)
-
-		#if str isnt '\u00a0' and pre.substr(pre.length - 1, 1) is '\u00a0'
-		#	pre = pre.substring(0, pre.length - 1) + ' '
 
 		@content = pre + str + post
 		@updateElement()
@@ -32,19 +31,45 @@ module.exports = class Section
 		selection = window.getSelection()
 		selection.removeAllRanges()
 		selection.addRange(range)
+	highlights: []
+	applyHighlight: (range, highlight) ->
+
+		### Need to figure out how to handle this circular dependance differently...
+		if !Editor.availableHighlights[highlight]?
+			console.error('highlight not registered')
+			return
+		@highlights.push(new Editor.availableHighlights[highlight](range.start, range.length))
+		###
+		if highlight is "bold"
+			@highlights.push(new Bold(range.start, range.length))
+
+		@updateElement()
 	render: () ->
-		ele = document.createElement(@tag)
-		ele.innerHTML = @content
+		@element.outerHTML
 	updateElement: ->
+
+		wrapText = (textNode, highlight) ->
+			pre = textNode.textContent.substr(0, highlight.start)
+			text = textNode.textContent.substr(highlight.start, highlight.length)
+			post = textNode.textContent.substr(highlight.start + highlight.length)
+
+
+			textNode.textContent = pre
+			newNode = document.createElement(highlight.tagName)
+			newNode.innerText = text
+
+			textNode.parentNode.insertBefore(newNode, textNode.nextSibling)
+			newNode.parentNode.insertBefore(document.createTextNode(post), newNode.nextSibling)
+
 		if @content?
 			text = @content
-			console.log(escape(text))
 			r2space = /\u0020\u0020/g
 			while(r2space.test(test))
 				text = test.repalce(r2space, '\u00a0 ')
 			text.replace(/\u0020$/g, '\u00a0')
-			console.log(escape(text))
 			@element.innerHTML = text
+			for highlight in @highlights
+				wrapText(@element.firstChild, highlight)
 		else
 			@element.childNodes.forEach (child) -> @element.removeChild(child)
-			@element.appendChild(document.createTextNod(''))
+			@element.appendChild(document.createTextNode(''))

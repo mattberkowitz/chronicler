@@ -1,5 +1,6 @@
 Paragraph = require('./Paragraph.coffee')
 Range = require('./Range.coffee')
+Bold = require('./Bold.coffee')
 
 module.exports = class Editor
 	constructor:(@input = input) ->
@@ -16,6 +17,11 @@ module.exports = class Editor
 
 		#@element.addEvent
 
+		@element.addEventListener 'keydown', (e) =>
+			if e.metaKey && e.keyCode is 66
+				@sections[@currentSection].applyHighlight(@currentRange, 'bold')
+				e.preventDefault()
+
 		@element.addEventListener 'keypress', (e) =>
 			@sections[@currentSection].insert(@currentRange.start, String.fromCharCode(e.charCode), @currentRange.length)
 			@currentRange.start = @currentRange.start + 1
@@ -26,10 +32,11 @@ module.exports = class Editor
 		@input.parentNode.insertBefore(@element, @input.nextSibling)
 		@input.style.display = 'none'
 	tag: "div"
-	className: "remington-editor"
+	className: "chronicler-editor"
 	sections: []
 	currentSection: 0
-	currentRange: new Range()
+	currentRange: new Range(),
+
 	add: (at, section) ->
 		@sections.splice(at, 0, section)
 		@element.insertBefore(section.element, @element.childNodes[at])
@@ -42,3 +49,9 @@ module.exports = class Editor
 		@sections.splice(to, 0, section)
 		@element.removeChild(section.element)
 		@element.insertBefore(section.element, @element.childNodes[to])
+
+	@availableHighlights:
+		"bold": Bold
+	@registerHighlight: (highlight) ->
+		if highlight.key?
+			@availableHighlihgts[highlight.key] = highlight
