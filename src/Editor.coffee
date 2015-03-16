@@ -1,25 +1,26 @@
 Paragraph = require('./Paragraph.coffee')
 Range = require('./Range.coffee')
-Bold = require('./Bold.coffee')
 
 module.exports = class Editor
 	constructor:(@input = input) ->
 		@element = document.createElement(@tag)
 		@element.contentEditable = true
 		@element.className = @className
-
 		@element.innerHTML = @input.value
 		for node in @element.childNodes
 			section = null
 			if node.tagName is 'p'
-				section = new Paragraph(node)
+				section = new Paragraph(node.innerHTML)
 			@add(@sections.length, section)
 
 		#@element.addEvent
 
 		@element.addEventListener 'keydown', (e) =>
 			if e.metaKey && e.keyCode is 66
-				@sections[@currentSection].applyHighlight(@currentRange, 'bold')
+				@sections[@currentSection].applyHighlight(new Range(4,6), 'bold')
+				e.preventDefault()
+			if e.metaKey && e.keyCode is 73
+				@sections[@currentSection].applyHighlight(new Range(6,2), 'italic')
 				e.preventDefault()
 
 		@element.addEventListener 'keypress', (e) =>
@@ -49,9 +50,3 @@ module.exports = class Editor
 		@sections.splice(to, 0, section)
 		@element.removeChild(section.element)
 		@element.insertBefore(section.element, @element.childNodes[to])
-
-	@availableHighlights:
-		"bold": Bold
-	@registerHighlight: (highlight) ->
-		if highlight.key?
-			@availableHighlihgts[highlight.key] = highlight

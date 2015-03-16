@@ -1,4 +1,7 @@
 Bold = require('./Bold.coffee')
+DomUtils = require('./utils/DomUtils.coffee')
+HighlightManager = require('./HighlightManager.coffee')
+Range = require('./Range.coffee')
 
 module.exports = class Section
 	constructor: (text) ->
@@ -31,35 +34,73 @@ module.exports = class Section
 		selection = window.getSelection()
 		selection.removeAllRanges()
 		selection.addRange(range)
-	highlights: []
-	applyHighlight: (range, highlight) ->
 
-		### Need to figure out how to handle this circular dependance differently...
-		if !Editor.availableHighlights[highlight]?
+	highlights: []
+	applyHighlight: (range, name) ->
+		highlight = HighlightManager.availableHighlights[name]
+		if !highlight?
 			console.error('highlight not registered')
 			return
-		@highlights.push(new Editor.availableHighlights[highlight](range.start, range.length))
-		###
-		if highlight is "bold"
-			@highlights.push(new Bold(range.start, range.length))
+
+		newHighlight = new highlight(range.start, range.length)
+
+		for existingHighlight in @highlights
+			if existingHighlight instanceof highlight
+				console.log existingHighlight.contains(newHighlight), existingHighlight.intersects(newHighlight)
+				if existingHighlight.contains(newHighlight)
+					return
+				else if existingHighlight.intersects(newHighlight)
+					existingHighlight.merge(newHighlight)
+					@updateElement()
+					return
+
+		@highlights.push(newHighlight)
 
 		@updateElement()
+
 	render: () ->
 		@element.outerHTML
+
+	textNodeContainingPoint: (point) ->
+		return @textNodesForRange(new Range(point,0))[0]
+
+	textNodesForRange: (highlight) ->
+		curPos = 0
+		curNode = DomUtils.getFirstTextNode(@element)
+		highlightLength = highlight.length
+
+		ret = []
+
+		while(curPos + curNode.textContent.length < highlight.start)
+			curPos += curNode.textContent.length
+			curNode = DomUtils.getNextTextNode(curNode, @element)
+
+
+		while(highlightLength > 0)
+			highlightStart = Math.max(curPos, highlight.start) - curPos
+			curNodeLength = curNode.textContent.length
+			highlightEnd = Math.min(highlightLength, curNodeLength - highlightStart) + highlightStart
+
+			ret.push
+				node: curNode
+				start: highlightStart
+				end: highlightEnd
+
+			highlightLength -= (highlightEnd - highlightStart)
+
+			curPos += curNodeLength
+			curNode = DomUtils.getNextTextNode(curNode, @element)
+
+		return ret
+
 	updateElement: ->
+		wrapText = (highlight) =>
+			toHighlight = @textNodesForRange(highlight)
 
-		wrapText = (textNode, highlight) ->
-			pre = textNode.textContent.substr(0, highlight.start)
-			text = textNode.textContent.substr(highlight.start, highlight.length)
-			post = textNode.textContent.substr(highlight.start + highlight.length)
-
-
-			textNode.textContent = pre
-			newNode = document.createElement(highlight.tagName)
-			newNode.innerText = text
-
-			textNode.parentNode.insertBefore(newNode, textNode.nextSibling)
-			newNode.parentNode.insertBefore(document.createTextNode(post), newNode.nextSibling)
+			for highlightMe in toHighlight
+				split = DomUtils.splitTextNode(highlightMe.node, highlightMe.start, highlightMe.end)
+				ele = document.createElement(highlight.tag)
+				DomUtils.wrapNode(split[1], ele)
 
 		if @content?
 			text = @content
@@ -69,7 +110,8 @@ module.exports = class Section
 			text.replace(/\u0020$/g, '\u00a0')
 			@element.innerHTML = text
 			for highlight in @highlights
-				wrapText(@element.firstChild, highlight)
+				wrapText(highlight)
+
 		else
 			@element.childNodes.forEach (child) -> @element.removeChild(child)
 			@element.appendChild(document.createTextNode(''))
