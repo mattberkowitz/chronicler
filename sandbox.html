@@ -1,0 +1,27 @@
+<html>
+	<head>
+		<style>
+			.chronicler-editor {
+				border: solid 1px #000;
+				padding: 10px
+			}
+			.chronicler-editor > * {
+				margin: 10px 0;
+				min-height: 18px;
+			}
+			.chronicler-editor > :first-child {
+				margin-top:0;
+			}
+			.chronicler-editor > :last-child {
+				margin-bottom:0;
+			}
+		</style>
+	</head>
+	<body>
+		<input id="test" value="" />
+		<script src="dist/chronicler.js"></script>
+		<script>
+			window.editor = new Chronicler.Editor(document.getElementById('test'))
+		</script>
+	</body>
+</html>

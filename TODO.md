@@ -19,3 +19,6 @@ Represents a selection within a Paragraph's text. start + length.
 ## Highlight
 
 A Range extended with information about a tag to wrap content in for rendering
+
+
+# Concepts
