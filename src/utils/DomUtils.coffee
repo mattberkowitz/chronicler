@@ -95,3 +95,12 @@ module.exports = class DomUtils
 			newNodes.push(newTextNode)
 		textNode.textContent = textNode.textContent.substring(0, points[0])
 		return newNodes
+
+	@closest: (node, condition) ->
+		while(node)
+			if "string" is typeof condition and node.matches and node.matches(condition)
+				return node
+			else if "function" is typeof condition and condition(node)
+				return node
+			node = node.parentNode
+		return null

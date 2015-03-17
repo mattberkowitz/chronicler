@@ -6,6 +6,8 @@ Range = require('./Range.coffee')
 module.exports = class Section
 	constructor: (text) ->
 		@element = document.createElement(@tag)
+		@element.addEventListener "pointerenter", (e) ->
+			console.log(e)
 		@content = text
 		@updateElement()
 	content: ""
@@ -28,8 +30,12 @@ module.exports = class Section
 		#alter selections
 	setCursorPosition: (pos, len = 0) ->
 		range = document.createRange()
-		range.setStart(@element.firstChild, pos)
-		range.setEnd(@element.firstChild, pos)
+
+		start = @textNodeAndPointContainingPoint(pos)
+		end = @textNodeAndPointContainingPoint(pos + len)
+
+		range.setStart(start.node, start.point)
+		range.setEnd(end.node, end.point)
 
 		selection = window.getSelection()
 		selection.removeAllRanges()
@@ -46,7 +52,6 @@ module.exports = class Section
 
 		for existingHighlight in @highlights
 			if existingHighlight instanceof highlight
-				console.log existingHighlight.contains(newHighlight), existingHighlight.intersects(newHighlight)
 				if existingHighlight.contains(newHighlight)
 					return
 				else if existingHighlight.intersects(newHighlight)
@@ -61,8 +66,26 @@ module.exports = class Section
 	render: () ->
 		@element.outerHTML
 
+	pointInSectionForPointInTextNode: (textNode, point) ->
+		while(textNode = DomUtils.getPreviousTextNode(textNode, @element))
+			point += textNode.textContent.length
+		return point
+
+	textNodeAndPointContainingPoint: (point) ->
+		curPos = 0
+		curNode = DomUtils.getFirstTextNode(@element)
+
+		while(curPos + curNode.textContent.length < point)
+			curPos += curNode.textContent.length
+			curNode = DomUtils.getNextTextNode(curNode, @element)
+
+		return {
+			point: point - curPos
+			node: curNode
+		}
+
 	textNodeContainingPoint: (point) ->
-		return @textNodesForRange(new Range(point,0))[0]
+		return @textNodeAndPointContainingPoint(point).node
 
 	textNodesForRange: (highlight) ->
 		curPos = 0
@@ -105,9 +128,9 @@ module.exports = class Section
 		if @content?
 			text = @content
 			r2space = /\u0020\u0020/g
-			while(r2space.test(test))
-				text = test.repalce(r2space, '\u00a0 ')
-			text.replace(/\u0020$/g, '\u00a0')
+			while(r2space.test(text))
+				text = text.replace(r2space, '\u00a0 ')
+			text = text.replace(/\u0020$/g, '\u00a0')
 			@element.innerHTML = text
 			for highlight in @highlights
 				wrapText(highlight)
