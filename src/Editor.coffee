@@ -7,6 +7,7 @@ module.exports = class Editor
 	constructor:(@input = input) ->
 		@element = document.createElement(@tag)
 		@element.contentEditable = true
+
 		@element.className = @className
 		@element.innerHTML = @input.value
 		for node in @element.childNodes
@@ -18,15 +19,26 @@ module.exports = class Editor
 		#@element.addEvent
 
 		@element.addEventListener 'keydown', (e) =>
-			if e.metaKey && e.keyCode is 66
+			if e.keyCode is KeyUtils.keyCodes.DOM_VK_BACK_SPACE
+				if @currentRange.isCollapsed()
+					@sections[@currentSection].delete(@currentRange.start - 1, 1)
+					@currentRange.start--
+				else
+					@sections[@currentSection].delete(@currentRange.start - 1, @currentRange.length)
+				@currentRange.length = 0
+				e.preventDefault()
+
+
+			if e.metaKey && e.keyCode is KeyUtils.keyCodes.DOM_VK_B
 				@sections[@currentSection].applyHighlight(@currentRange, 'bold')
 				e.preventDefault()
-			if e.metaKey && e.keyCode is 73
+			if e.metaKey && e.keyCode is KeyUtils.keyCodes.DOM_VK_I
 				@sections[@currentSection].applyHighlight(@currentRange, 'italic')
 				e.preventDefault()
 
 
 		@element.addEventListener 'keypress', (e) =>
+			#console.log('p', e.keyCode, e)
 			@sections[@currentSection].insert(@currentRange.start, String.fromCharCode(e.charCode), @currentRange.length)
 			@currentRange.start = @currentRange.start + 1
 			@currentRange.length = 0
@@ -35,6 +47,7 @@ module.exports = class Editor
 
 		# user moved cursor, reset internal tracking
 		@element.addEventListener 'keyup', (e) =>
+			#console.log('u', e.keyCode, e)
 			if e.keyCode in KeyUtils.movementKeys
 				@setCursorPosition()
 

@@ -9,7 +9,7 @@ module.exports = class DomUtils
 	###
 	@getLastDecendant: (node) ->
 		while node.lastChild?
-			node = node.lastChilde
+			node = node.lastChild
 		return node
 
 	###
@@ -31,6 +31,9 @@ module.exports = class DomUtils
 		return last
 
 	@getPreviousTextNode: (node, root='p') ->
+
+
+
 		#no previous sibling
 		if !node.previousSibling?
 			#if parent is <p> we're done
@@ -75,6 +78,7 @@ module.exports = class DomUtils
 		else
 			return @getNextTextNode(nextFirstDecendant, root)
 
+	###
 	@wrapNode: (node, withNode) ->
 		dummyNode = document.createTextNode('')
 		parentNode = node.parentNode
@@ -82,18 +86,16 @@ module.exports = class DomUtils
 		withNode.appendChild(node)
 		parentNode.replaceChild(withNode, dummyNode)
 		return withNode
+	###
 
 
 	@splitTextNode: (textNode, points...) ->
-		newNodes = [textNode]
-		parentNode = textNode.parentNode
+		newNodes = [document.createTextNode(textNode.textContent.substring(0, points[0]))]
 		for point, i in points
 			endPoint = if i is points.length - 1 then undefined else points[i+1]
 			newText = textNode.textContent.substring(point, endPoint)
 			newTextNode = document.createTextNode(newText)
-			parentNode.insertBefore newTextNode, newNodes[newNodes.length - 1].nextSibling
 			newNodes.push(newTextNode)
-		textNode.textContent = textNode.textContent.substring(0, points[0])
 		return newNodes
 
 	@closest: (node, condition) ->
@@ -104,3 +106,12 @@ module.exports = class DomUtils
 				return node
 			node = node.parentNode
 		return null
+
+	@getChildTextNodes: (node) ->
+		ret = []
+		[].forEach.call node.childNodes, (child) ->
+			if child.nodeType is 3
+				ret.push(child)
+			else
+				ret = ret.concat(@getChildTextNode(child))
+		return ret

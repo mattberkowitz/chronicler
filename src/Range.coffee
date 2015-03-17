@@ -14,6 +14,8 @@ Range = class Range
 			@start = range.end
 		if range.end > @end
 			@length = range.end - @start
+	containsPoint: (point) ->
+		@start <= point and @end >= point
 
 Object.defineProperty Range.prototype, 'end',
 	get: () ->
