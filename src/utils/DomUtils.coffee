@@ -22,16 +22,18 @@ module.exports = class DomUtils
 
 	@getFirstTextNode: (node) ->
 		first = @getFirstDecendant(node)
-		first = @getNextTextNode(first) if first.nodeType isnt 3
+		first = @getNextTextNode(first, node) if first.nodeType isnt 3
 		return first
 
 	@getLastTextNode: (node) ->
 		last = @getLastDecendant(node)
-		last = @getPreviousTextNode(first) if first.nodeType isnt 3
+		last = @getPreviousTextNode(first, node) if first.nodeType isnt 3
 		return last
 
 	@getPreviousTextNode: (node, root='p') ->
 
+		if node is root
+			return null
 
 
 		#no previous sibling
@@ -48,7 +50,7 @@ module.exports = class DomUtils
 			if node.previousSibling.textContent?.length > 0
 				return node.previousSibling
 			else
-				return @getPreviousTextNode(node.previousSibling)
+				return @getPreviousTextNode(node.previousSibling, root)
 
 
 		previousLastDecendant =  @getLastDecendant(node.previousSibling)
@@ -58,6 +60,10 @@ module.exports = class DomUtils
 			return @getPreviousTextNode(previousLastDecendant, root)
 
 	@getNextTextNode: (node, root='p') ->
+
+		if node is root
+			return null
+
 		#no next sibling
 		if !node.nextSibling?
 			if node is root or node.parentNode is null or (typeof root is "string" and node.parentNode.matches(root))
@@ -70,7 +76,7 @@ module.exports = class DomUtils
 			if node.nextSibling.textContent?.length > 0
 				return node.nextSibling
 			else
-				return @getNextTextNode(node.nextSibling)
+				return @getNextTextNode(node.nextSibling, root)
 
 		nextFirstDecendant = @getFirstDecendant(node.nextSibling)
 		if nextFirstDecendant.nodeType is 3 and nextFirstDecendant.textContent?.length > 0
@@ -109,9 +115,79 @@ module.exports = class DomUtils
 
 	@getChildTextNodes: (node) ->
 		ret = []
-		[].forEach.call node.childNodes, (child) ->
+		[].forEach.call node.childNodes, (child) =>
 			if child.nodeType is 3
 				ret.push(child)
 			else
-				ret = ret.concat(@getChildTextNode(child))
+				ret = ret.concat(@getChildTextNodes(child) || [])
 		return ret
+
+	@indexInAncestorForIndexInTextNode: (ancestor, textNode, index) ->
+		while(textNode = DomUtils.getPreviousTextNode(textNode, ancestor))
+			console.log(textNode)
+			index += textNode.textContent.length
+		return index
+
+	@textNodeAndIndexForElementIndex: (element, index) ->
+		debugger
+		curPos = 0
+		curNode = DomUtils.getFirstTextNode(element)
+
+		while(curPos + curNode.textContent.length < index)
+			curPos += curNode.textContent.length
+			curNode = DomUtils.getNextTextNode(curNode, element)
+
+		return {
+			index: index - curPos
+			node: curNode
+		}
+
+	@textNodeContainingIndex: (element, index) ->
+		return DomUtils.textNodeAndIndexForElementIndex(@element, index).node
+
+	@textNodesForRange: (element, range) ->
+		curPos = 0
+		curNode = DomUtils.getFirstTextNode(element)
+		rangeLength = range.length
+
+		ret = []
+
+		while(curPos + curNode.textContent.length < range.start)
+			curPos += curNode.textContent.length
+			curNode = DomUtils.getNextTextNode(curNode, element)
+
+		while(rangeLength > 0)
+			rangeStart = Math.max(curPos, range.start) - curPos
+			curNodeLength = curNode.textContent.length
+			rangeEnd = Math.min(rangeLength, curNodeLength - rangeStart) + rangeStart
+
+			ret.push
+				node: curNode
+				start: rangeStart
+				end: rangeEnd
+
+			rangeLength -= (rangeEnd - rangeStart)
+
+			curPos += curNodeLength
+			curNode = DomUtils.getNextTextNode(curNode, element)
+
+		return ret
+
+	@nodeDirection: (node, comparedTo) ->
+		parent = comparedTo.parentNode
+		nodeSiblingOfComparedTo = @closest node, (n) -> n.parentNode is parent
+		return 0 if nodeSiblingOfComparedTo is comparedTo
+		compareIndex = null
+		compareSiblingIndex = null
+		for child, i in parent.childNodes
+			if child is comparedTo
+				compareIndex = i
+			else if child is nodeSiblingOfComparedTo
+				compareSiblingIndex = i
+
+		if !compareIndex? or !compareSiblingIndex?
+			return null
+		else if compareIndex > compareSiblingIndex
+			return -1
+		else
+			return 1

@@ -5,3 +5,4 @@ window.Chronicler =
 	Utils:
 		Dom: require('./utils/DomUtils.coffee')
 		Key: require('./utils/KeyUtils.coffee')
+		String: require('./utils/StringUtils.coffee')

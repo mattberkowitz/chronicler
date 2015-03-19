@@ -14,5 +14,8 @@
     "grunt-browserify": "^3.3.0",
     "grunt-contrib-clean": "^0.6.0",
     "grunt-contrib-watch": "^0.6.1"
+  },
+  "dependencies": {
+    "diff": "^1.3.1"
   }
 }
