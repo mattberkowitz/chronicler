@@ -129,7 +129,6 @@ module.exports = class DomUtils
 		return index
 
 	@textNodeAndIndexForElementIndex: (element, index) ->
-		debugger
 		curPos = 0
 		curNode = DomUtils.getFirstTextNode(element)
 
