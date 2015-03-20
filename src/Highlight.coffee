@@ -1,5 +1,5 @@
-Range = require('./Range.coffee')
+Selection = require('./Selection.coffee')
 
-module.exports = class Highlight extends Range
+module.exports = class Highlight extends Selection
 	className: ""
 	tag: "span"

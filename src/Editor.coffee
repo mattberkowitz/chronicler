@@ -7,6 +7,7 @@ Editor = class Editor
 	constructor:(@input = input) ->
 		@element = document.createElement(@tag)
 		@element.contentEditable = true
+		@sections = []
 
 		@element.className = @className
 		@element.innerHTML = @input.value
@@ -17,18 +18,23 @@ Editor = class Editor
 			@add(@sections.length, section)
 
 
+		@add(0, new Paragraph('')) if @sections.length is 0
+		@input.parentNode.insertBefore(@element, @input.nextSibling)
+		@input.style.display = 'none'
+
+	_events: () ->
 		@element.addEventListener 'keydown', (e) =>
 			# @sections[@currentSection].element.dispatchEvent(e)
 
 			if e.keyCode is KeyUtils.keyCodes.DOM_VK_BACK_SPACE
 				selections = @getSelectionBySection()
 				first = selections[0]
-				if first.selection.isCollapsed()
-					first.section.delete(first.selection.start - 1, 1)
-					first.section.setCursorPosition(first.selection.start - 1)
+				if first.isCollapsed()
+					first.section.delete(first.start - 1, 1)
+					first.section.setCursorPosition(first.start - 1)
 				else
-					@multisectionDelete(selections)
-					first.section.setCursorPosition(first.selection.start)
+					@multiSectionDelete(selections)
+					first.section.setCursorPosition(first.start)
 				e.preventDefault()
 
 			if e.metaKey && e.keyCode is KeyUtils.keyCodes.DOM_VK_B
@@ -36,16 +42,19 @@ Editor = class Editor
 				start = selections[0]
 				end = selections[selections.length - 1]
 				for selection in selections
-					selection.section.applyHighlight(selection.selection, 'bold')
-				@setSelection(start.section, start.selection.start, end.section, end.selection.end)
+					console.log(selection)
+					selection.applyHighlight('bold')
+				@setSelection(start.section, start.range.start, end.section, end.range.end)
 				e.preventDefault()
+
 			if e.metaKey && e.keyCode is KeyUtils.keyCodes.DOM_VK_I
 				selections = @getSelectionBySection()
 				start = selections[0]
 				end = selections[selections.length - 1]
 				for selection in selections
-					selection.section.applyHighlight(selection.selection, 'italic')
-				@setSelection(start.section, start.selection.start, end.section, end.selection.end)
+					console.log(selection)
+					selection.applyHighlight('italic')
+				@setSelection(start.section, start.range.start, end.section, end.range.end)
 				e.preventDefault()
 
 
@@ -60,11 +69,12 @@ Editor = class Editor
 					selections = @getSelectionBySection()
 
 					first = selections[0]
-					if !first.selection.isCollapsed()
+					if !first.isCollapsed()
 						@multisectionDelete(selections)
-					first.section.insert(first.selection.start, char)
-					first.section.setCursorPosition(first.selection.start + char.length)
+					first.section.insert(first.start, char)
+					first.section.setCursorPosition(first.start + char.length)
 					e.preventDefault()
+
 
 		# user moved cursor, reset internal tracking
 		###
@@ -78,13 +88,9 @@ Editor = class Editor
 			@setCursorPosition()
 		###
 
-		@add(0, new Paragraph('')) if @sections.length is 0
-		@input.parentNode.insertBefore(@element, @input.nextSibling)
-		@input.style.display = 'none'
 
 	tag: "div"
 	className: "chronicler-editor"
-	sections: []
 	currentSection: 0
 	currentRange: new Range()
 
@@ -99,11 +105,7 @@ Editor = class Editor
 		for section, i in @sections
 			add = true if section.element is startSection
 			if add
-				ret.push {
-					section: section
-					index: i
-					selection: section.getSelection()
-				}
+				ret.push section.getSelection()
 			add = false if section.element is endSection
 
 		return ret
@@ -147,28 +149,36 @@ Editor = class Editor
 	add: (at, section) ->
 		@sections.splice(at, 0, section)
 		@element.insertBefore(section.element, @element.childNodes[at])
-	remove: (at, keepElement = true) ->
+
+	remove: (section) -> @removeAtIndex(@getSectionIndex(section))
+
+	removeAtIndex: (at) ->
 		removed = @sections.splice(at, 1)
-		if !keepElement
-			removed[0].destroy()
+
 	move: (at, to) ->
 		section = @sections[at]
 		@sections.splice(at, 1)
 		@sections.splice(to, 0, section)
 		@element.removeChild(section.element)
 		@element.insertBefore(section.element, @element.childNodes[to])
+
+	getSectionIndex: (section) ->
+		for s, i in @sections
+			return i if s is section
+		return null
+
 	multiSectionDelete: (selections) ->
 		first = selections[0]
 		last = selections[selections.length - 1]
 		if selections.length > 1
-			last.section.delete(last.selection.start, last.selection.length)
+			last.clear()
 			first.section.merge(last.section)
 
 			for selection,i in selections.reverse()[0...selections.length - 1]
-				@remove(selection.index)
+				@remove(selection.section)
 
-			if selections.length > 0
-				first.section.delete(first.selection.start, first.selection.length)
+		if selections.length > 0
+			first.clear()
 
 Object.defineProperty Editor.prototype, 'content',
 	get: () ->

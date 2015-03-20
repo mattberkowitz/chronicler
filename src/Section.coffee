@@ -5,12 +5,13 @@ RenderUtils = require('./utils/RenderUtils.coffee')
 StringUtils = require('./utils/StringUtils.coffee')
 HighlightManager = require('./HighlightManager.coffee')
 Range = require('./Range.coffee')
+Selection = require('./Selection.coffee')
 
 module.exports = class Section
 	constructor: (text) ->
 		@element = document.createElement(@tag)
 		@element.style.whiteSpace = 'pre'
-
+		@highlights = []
 		# create an observer instance
 		###
 		@observer = new MutationObserver (mutations) =>
@@ -93,28 +94,26 @@ module.exports = class Section
 
 
 		for highlight in @highlights
-			if highlight.containsPoint(start)
-				highlight.length += str.length
+			if highlight.range.containsPoint(start)
+				highlight.range.length += str.length
+			else if start < highlight.range.start
+				highlight.range.start += str.length
 
 
 
 		@updateElement()
-		#@setCursorPosition(start + str.length)
-
-
 
 	delete: (start, len) ->
-		console.log('rem', start, len)
 		@content = @content.slice(0, start) + @content.slice(start + len)
 
 		cursorRange = new Range(start, len)
 		newHighlights = []
 		for highlight in @highlights
-			if highlight.contains(cursorRange)
+			if highlight.range.contains(cursorRange)
 				highlight.length -= cursorRange.length
 			else if cursorRange.contains(highlight)
 				continue
-			else if highlight.intersects(cursorRange)
+			else if highlight.range.intersects(cursorRange)
 				if cursorRange.start < highlight.start
 					highlight.length -= (cursorRange.end - highlight.start)
 				else
@@ -122,7 +121,7 @@ module.exports = class Section
 
 			if start < highlight.start
 				highlight.start -= len
-				if cursorRange.intersects(highlight)
+				if cursorRange.intersects(highlight.range)
 					highlight.start += (cursorRange.end - highlight.start)
 
 
@@ -130,7 +129,6 @@ module.exports = class Section
 		@highlights = newHighlights
 
 		@updateElement()
-		#@setCursorPosition(start)
 
 	setCursorPosition: (pos, len = 0) ->
 		range = document.createRange()
@@ -145,23 +143,21 @@ module.exports = class Section
 		selection.removeAllRanges()
 		selection.addRange(range)
 
-
-
-	highlights: []
 	applyHighlight: (range, name) ->
+		console.log name, ' from ', range.start, ' to ', range.end, range
 		highlight = HighlightManager.availableHighlights[name]
 		if !highlight?
 			console.error('highlight not registered')
 			return
 
-		newHighlight = new highlight(range.start, range.length)
+		newHighlight = new highlight(@, range)
 
 		for existingHighlight in @highlights
 			if existingHighlight instanceof highlight
-				if existingHighlight.contains(newHighlight)
+				if existingHighlight.range.contains(newHighlight.range)
 					return
-				else if existingHighlight.intersects(newHighlight)
-					existingHighlight.merge(newHighlight)
+				else if existingHighlight.range.intersects(newHighlight.range)
+					existingHighlight.range.merge(newHighlight.range)
 					@updateElement()
 					return
 
@@ -173,7 +169,7 @@ module.exports = class Section
 		switch mode
 			when "html-dom"
 				wrapText = (highlight) =>
-					toHighlight = DomUtils.textNodesForRange(container, highlight)
+					toHighlight = DomUtils.textNodesForRange(container, highlight.range)
 
 					for highlightMe in toHighlight
 						parent = highlightMe.node.parentNode
@@ -205,9 +201,9 @@ module.exports = class Section
 			when "html-string"
 				buffer = ""
 				orderedHighlights = @highlights.sort (a, b) ->
-					if a.start < b.start
+					if a.range.start < b.range.start
 						return -1
-					else if a.start > b.start
+					else if a.range.start > b.range.start
 						return 1
 					else
 						return 0
@@ -217,16 +213,16 @@ module.exports = class Section
 				openHighlights = []
 				for char, i in text
 					for highlight in orderedHighlights
-						if highlight.start is i
+						if highlight.range.start is i
 							buffer += RenderUtils.renderObjectElementString(highlight, RenderUtils.types.OPEN)
 							openHighlights.push(highlight)
-						else if highlight.start > i
+						else if highlight.range.start > i
 							break
 
 					reverseOpenHighlights = openHighlights.reverse()
 					openHighlights = []
 					for highlight in reverseOpenHighlights
-						if highlight.end is i
+						if highlight.range.end is i
 							for reopenedHighlight in openHighlights
 								buffer += RenderUtils.renderObjectElementString(reopenedHighlight, RenderUtils.types.CLOSE)
 							buffer += RenderUtils.renderObjectElementString(highlight, RenderUtils.types.CLOSE)
@@ -266,9 +262,6 @@ module.exports = class Section
 		start = null
 		end = null
 
-		console.log(startDir, endDir)
-
-
 		# selection is somewhere outside of the content editable
 		return null if !startDir? or !endDir?
 
@@ -285,10 +278,7 @@ module.exports = class Section
 		else
 			end = DomUtils.indexInAncestorForIndexInTextNode(@element, range.endContainer, range.endOffset)
 
-		return new Range(start, end-start)
-
-
-		console.log(start, end)
+		return new Selection(@, start, end-start)
 
 
 
@@ -299,11 +289,9 @@ module.exports = class Section
 			@content = ''
 
 		@element.innerHTML = @render('html-string')
-	###
+
 		@_ensureTextNode()
 
 	_ensureTextNode: ->
 		return if DomUtils.getChildTextNodes(@element).length > 0
-		console.log('adding text node')
 		@element.insertBefore(document.createTextNode(''), @element.firstChild)
-	###
