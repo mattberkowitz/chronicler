@@ -8,15 +8,23 @@ Editor = class Editor
 		@element = document.createElement(@tag)
 		@element.contentEditable = true
 		@sections = []
+		@_sectionIsCurrent = false
+		@_currentSection = null
 
 		@element.className = @className
-		@element.innerHTML = @input.value
-		for node in @element.childNodes
+
+		div = document.createElement('div')
+		div.innerHTML = @input.value
+
+		for node in div.childNodes
 			section = null
-			if node.tagName is 'p'
+			if node.tagName is 'P'
 				section = new Paragraph(node.innerHTML)
 			@add(@sections.length, section)
 
+		@_events()
+
+		div = null
 
 		@add(0, new Paragraph('')) if @sections.length is 0
 		@input.parentNode.insertBefore(@element, @input.nextSibling)
@@ -24,14 +32,42 @@ Editor = class Editor
 
 	_events: () ->
 		@element.addEventListener 'keydown', (e) =>
-			# @sections[@currentSection].element.dispatchEvent(e)
 
 			if e.keyCode is KeyUtils.keyCodes.DOM_VK_BACK_SPACE
 				selections = @getSelectionBySection()
 				first = selections[0]
-				if first.isCollapsed()
-					first.section.delete(first.start - 1, 1)
-					first.section.setCursorPosition(first.start - 1)
+				if selections.length is 1 and first.isCollapsed()
+					if first.start is 0
+						firstIndex = @getSectionIndex(first.section)
+						prev = @sections[firstIndex - 1]
+						prevEnd = prev.content.length
+						prev.merge(first.section)
+						first.section.destroy()
+						@removeAtIndex(firstIndex)
+						prev.setCursorPosition(prevEnd)
+					else
+						first.section.delete(first.start - 1, 1)
+						first.section.setCursorPosition(first.start - 1)
+				else
+					@multiSectionDelete(selections)
+					first.section.setCursorPosition(first.start)
+				e.preventDefault()
+			else if e.keyCode is KeyUtils.keyCodes.DOM_VK_DELETE
+				selections = @getSelectionBySection()
+				first = selections[0]
+				if selections.length is 1 and first.isCollapsed()
+					if first.start is first.section.content.length
+						firstIndex = @getSectionIndex(first.section)
+						firstLength = first.section.content.length
+						if firstIndex < @sections.length - 1
+							next = @sections[firstIndex + 1]
+							first.section.merge(next)
+							next.destroy()
+							@remove(next)
+							first.section.setCursorPosition(firstLength)
+					else
+						first.section.delete(first.start, 1)
+						first.section.setCursorPosition(first.start)
 				else
 					@multiSectionDelete(selections)
 					first.section.setCursorPosition(first.start)
@@ -42,7 +78,6 @@ Editor = class Editor
 				start = selections[0]
 				end = selections[selections.length - 1]
 				for selection in selections
-					console.log(selection)
 					selection.applyHighlight('bold')
 				@setSelection(start.section, start.range.start, end.section, end.range.end)
 				e.preventDefault()
@@ -52,7 +87,6 @@ Editor = class Editor
 				start = selections[0]
 				end = selections[selections.length - 1]
 				for selection in selections
-					console.log(selection)
 					selection.applyHighlight('italic')
 				@setSelection(start.section, start.range.start, end.section, end.range.end)
 				e.preventDefault()
@@ -60,8 +94,14 @@ Editor = class Editor
 
 		@element.addEventListener 'keypress', (e) =>
 			if e.keyCode is 13
-				@add(@currentSection + 1, new Paragraph(''))
-				@setCursorPosition(@currentSection + 1, 0)
+				selections = @getSelectionBySection()
+
+				if !selections[0]?.isCollapsed() or selections.length > 1
+					@multiSectionDelete(selections)
+
+				addIndex = @currentSectionIndex + 1
+				@add(addIndex, @currentSection.splitAtIndex(selections[0].start))
+				@setCursorPosition(addIndex, 0)
 				e.preventDefault()
 			else
 				char = String.fromCharCode(e.charCode)
@@ -69,30 +109,25 @@ Editor = class Editor
 					selections = @getSelectionBySection()
 
 					first = selections[0]
-					if !first.isCollapsed()
-						@multisectionDelete(selections)
+					if !first.isCollapsed() or selections.length > 0
+						@multiSectionDelete(selections)
 					first.section.insert(first.start, char)
 					first.section.setCursorPosition(first.start + char.length)
 					e.preventDefault()
 
 
-		# user moved cursor, reset internal tracking
-		###
+
 		@element.addEventListener 'keyup', (e) =>
 			#console.log('u', e.keyCode, e)
 			if e.keyCode in KeyUtils.movementKeys
-				@setCursorPosition()
+				@_sectionIsCurrent = false
 
 		@element.addEventListener 'mouseup', (e) =>
-			#debugger;
-			@setCursorPosition()
-		###
+			@_sectionIsCurrent = false
 
 
 	tag: "div"
 	className: "chronicler-editor"
-	currentSection: 0
-	currentRange: new Range()
 
 	getSelectionBySection: () ->
 		selection = window.getSelection()
@@ -108,6 +143,11 @@ Editor = class Editor
 				ret.push section.getSelection()
 			add = false if section.element is endSection
 
+		# since were getting this anyway, set it maybe save some cycles in the future
+		if ret.length > 0
+			@_sectionIsCurrent = true
+			@_currentSection = ret[0].section
+
 		return ret
 
 
@@ -122,6 +162,9 @@ Editor = class Editor
 			end = DomUtils.textNodeAndIndexForElementIndex(endSection.element, endIndex)
 			range.setEnd(end.node, end.index)
 		selection.addRange(range)
+
+		@_sectionIsCurrent = true
+		@_currentSection = startSection
 
 	setCursorPosition: (section, char, length) ->
 		if !section? or !char? #if these two params are passed user is setting position
@@ -142,9 +185,9 @@ Editor = class Editor
 
 		#return if section is @currentSection and char is @currentRange.start and length is @currentRange.length
 
-		@currentSection = section
-		@currentRange = new Range(char, length)
 		@sections[section].setCursorPosition(char, length)
+		@_sectionIsCurrent = true
+		@_currentSection = @sections[section]
 
 	add: (at, section) ->
 		@sections.splice(at, 0, section)
@@ -175,6 +218,7 @@ Editor = class Editor
 			first.section.merge(last.section)
 
 			for selection,i in selections.reverse()[0...selections.length - 1]
+				selection.section.destroy()
 				@remove(selection.section)
 
 		if selections.length > 0
@@ -185,6 +229,24 @@ Object.defineProperty Editor.prototype, 'content',
 		contents = @sections.map (section) -> section.content
 		contents.join('\n\n')
 
+Object.defineProperty Editor.prototype, 'currentSection',
+	get: () ->
+		if !@_sectionIsCurrent or @_currentSection is null
+			selections = @getSelectionBySection()
+			if selections.length > 0
+				@_sectionIsCurrent = true
+				@_currentSection = selections[0].section
+			else
+				return null
+		return @_currentSection
+
+Object.defineProperty Editor.prototype, 'currentSectionIndex',
+	get: () ->
+		section = @currentSection
+		if section?
+			return @getSectionIndex(section)
+		else
+			return null
 
 
 module.exports = Editor
