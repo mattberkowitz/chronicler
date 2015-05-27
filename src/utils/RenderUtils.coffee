@@ -8,12 +8,14 @@ RenderUtils =
 		if type is this.types.CLOSE
 			buffer += '/'
 		buffer += obj.tag
-		if type is this.types.OPEN and obj.classNames?
+		if type isnt this.types.CLOSE and obj.classNames?
 			buffer += (' class="' + obj.classNames.join(' ') + '"')
+			for k, v of obj.attributes?
+				buffer += " #{k}=\"#{v}\""
 		if type is this.types.SELFCLOSING
 			buffer += ' /'
 		buffer += '>'
-		
+
 		return buffer
 
 

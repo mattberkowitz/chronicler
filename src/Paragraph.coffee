@@ -7,6 +7,7 @@ StringUtils = require('./utils/StringUtils.coffee')
 HighlightManager = require('./HighlightManager.coffee')
 Range = require('./Range.coffee')
 Selection = require('./Selection.coffee')
+Deletion = require('./Deletion.coffee')
 
 module.exports = class Paragraph extends Section
 	tag: 'p'
@@ -14,6 +15,7 @@ module.exports = class Paragraph extends Section
 		super()
 		@element.style.whiteSpace = 'pre'
 		@highlights = []
+		@insertions = []
 		# create an observer instance
 		###
 		@observer = new MutationObserver (mutations) =>
@@ -140,8 +142,23 @@ module.exports = class Paragraph extends Section
 		selection.removeAllRanges()
 		selection.addRange(range)
 
+	calcTrackChanges: (changes) ->
+		changeList = [].concat(changes, [{value:content}])
+		tempPara = new Paragraph(changeList[0].value);
+		for i in [1...changeList.length-1]
+			diff = StringUtils.diff(tempPara.content, changesList[i].value)
+			for change in diff
+				if change.added
+					@insert(index, change.value)
+				if change.removed
+					@delete(index, change.value.length)
+
+	addInsertion: (start, name, options) ->
+		deletion = new Deletion(@, start)
+		deletion.value = options?.value || ''
+		@insertions.push(deletion)
+
 	applyHighlight: (range, name) ->
-		console.log name, ' from ', range.start, ' to ', range.end, range
 		highlight = HighlightManager.availableHighlights[name]
 		if !highlight?
 			console.error('highlight not registered')
@@ -194,21 +211,22 @@ module.exports = class Paragraph extends Section
 					wrapText(highlight)
 
 				return container.innerHTML
-
 			when "html-string"
 				buffer = ""
-				orderedHighlights = @highlights.sort (a, b) ->
-					if a.range.start < b.range.start
-						return -1
-					else if a.range.start > b.range.start
-						return 1
-					else
-						return 0
+				orderedHighlights = @highlights.sort (a, b) -> (a.range.start - b.range.start) / Math.abs(a.range.start - b.range.start)
+				orderedInsertions = @insertions.sort (a, b) -> (a.range.start - b.range.start) / Math.abs(a.range.start - b.range.start)
 
 				text = @content
 
 				openHighlights = []
 				for char, i in text
+
+					for insertion in orderedInsertions
+						if insertion.range.start is i
+							buffer += insertion.render()
+						else if insertion.range.start > i
+							break
+
 					for highlight in orderedHighlights
 						if highlight.range.start is i
 							buffer += RenderUtils.renderObjectElementString(highlight, RenderUtils.types.OPEN)
