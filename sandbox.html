@@ -15,13 +15,29 @@
 			.chronicler-editor > :last-child {
 				margin-bottom:0;
 			}
+			.chronicler-editor .addition {
+				color: #0f0;
+			}
+			.chronicler-editor .deletion {
+    			text-decoration: line-through;
+				color: #f00
+			}
+			.chronicler-editor .deletion:before {
+				content: attr(data-text);
+			}
+
 		</style>
 	</head>
 	<body>
-		<input id="test" value="<p>This is</p><p>a test</p>" />
+		<input id="test" value="<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>" />
 		<script src="dist/chronicler.js"></script>
 		<script>
 			window.editor = new Chronicler.Editor(document.getElementById('test'))
+			window.testChanges = [
+				{value:"ipsum dolor sit amet, something"},
+				{value:"Lorem ipsum dolor sit amet"},
+				{value:'Lorem ipsum dolor sit amet, consectetur adipiscing elit.'}
+			]
 		</script>
 	</body>
 </html>

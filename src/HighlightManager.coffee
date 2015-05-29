@@ -1,5 +1,6 @@
 Bold = require('./Bold.coffee')
 Italic = require('./Italic.coffee')
+Addition = require('./Addition.coffee')
 
 HighlightManger = class HighlightManager
 	@availableHighlights: []
@@ -8,6 +9,6 @@ HighlightManger = class HighlightManager
 			if highlight.key?
 				@availableHighlights[highlight.key] = highlight
 
-HighlightManager.registerHighlight(Bold, Italic)
+HighlightManager.registerHighlight(Bold, Italic, Addition)
 
 module.exports = HighlightManager

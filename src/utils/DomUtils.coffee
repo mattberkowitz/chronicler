@@ -124,7 +124,6 @@ module.exports = class DomUtils
 
 	@indexInAncestorForIndexInTextNode: (ancestor, textNode, index) ->
 		while(textNode = DomUtils.getPreviousTextNode(textNode, ancestor))
-			console.log(textNode)
 			index += textNode.textContent.length
 		return index
 

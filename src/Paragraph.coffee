@@ -8,6 +8,7 @@ HighlightManager = require('./HighlightManager.coffee')
 Range = require('./Range.coffee')
 Selection = require('./Selection.coffee')
 Deletion = require('./Deletion.coffee')
+Addition = require('./Addition.coffee')
 
 module.exports = class Paragraph extends Section
 	tag: 'p'
@@ -98,8 +99,6 @@ module.exports = class Paragraph extends Section
 			else if start < highlight.range.start
 				highlight.range.start += str.length
 
-
-
 		@updateElement()
 
 	delete: (start, len) ->
@@ -126,7 +125,6 @@ module.exports = class Paragraph extends Section
 
 			newHighlights.push(highlight)
 		@highlights = newHighlights
-
 		@updateElement()
 
 	setCursorPosition: (pos, len = 0) ->
@@ -143,15 +141,29 @@ module.exports = class Paragraph extends Section
 		selection.addRange(range)
 
 	calcTrackChanges: (changes) ->
-		changeList = [].concat(changes, [{value:content}])
+		changeList = [].concat(changes, [{value:@content}])
 		tempPara = new Paragraph(changeList[0].value);
-		for i in [1...changeList.length-1]
-			diff = StringUtils.diff(tempPara.content, changesList[i].value)
+		console.log(changeList)
+		for i in [1...changeList.length]
+			diff = StringUtils.diff(tempPara.content, changeList[i].value)
+			index = 0
 			for change in diff
 				if change.added
-					@insert(index, change.value)
+					tempPara.insert(index, change.value)
+					tempPara.applyHighlight(new Range(index, change.value.length), "addition")
+					index+=change.value.length
 				if change.removed
-					@delete(index, change.value.length)
+					tempPara.delete(index, change.value.length)
+					tempPara.addInsertion(index, "delete", value: change.value)
+					index-=change.value.length;
+				if !change.removed and !change.added
+					index+=change.value.length;
+
+		@insertions = @insertions.filter (insertion) -> !(insertion instanceof Deletion)
+		@insertions = @insertions.concat(tempPara.insertions)
+		@highlights = @highlights.filter (highlight) -> !(highlight instanceof Addition)
+		@highlights = @highlights.concat(tempPara.highlights)
+		@updateElement()
 
 	addInsertion: (start, name, options) ->
 		deletion = new Deletion(@, start)
