@@ -122,11 +122,12 @@ Editor = class Editor
 			if e.keyCode in KeyUtils.movementKeys
 				@_sectionIsCurrent = false
 
-
+			###
 			selections = @getSelectionBySection()
-				for selection in selections
+			for selection in selections
 				selection.section.calcTrackChanges(testChanges)
-				
+			###
+
 		@element.addEventListener 'mouseup', (e) =>
 			@_sectionIsCurrent = false
 

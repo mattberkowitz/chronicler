@@ -83,14 +83,19 @@ module.exports = class Paragraph extends Section
 	content: ""
 	tag: "section"
 
-	insert: (start, str, len = 0) ->
+	insert: (start, str, len = 0, silent=false) ->
 		if len > 0
-			@delete(start, len)
+			@delete(start, len, true)
 
 		pre = @content.substring(0, start)
 		post = @content.substring(start)
 
 		@content = pre + str + post
+
+		for insertion in @insertions
+			if insertion.start > start
+				console.log 'shift inesertion'
+				insertion.start += str.length
 
 
 		for highlight in @highlights
@@ -99,12 +104,27 @@ module.exports = class Paragraph extends Section
 			else if start < highlight.range.start
 				highlight.range.start += str.length
 
-		@updateElement()
+		if !silent
+			@addChange(@content)
+			@updateElement()
 
-	delete: (start, len) ->
+	delete: (start, len, silent=false) ->
 		@content = @content.slice(0, start) + @content.slice(start + len)
 
 		cursorRange = new Range(start, len)
+
+		newInsertions = []
+		for insertion in @insertions
+
+			continue if cursorRange.containsPoint(insertion.start)
+
+			if cursorRange.start < insertion.start
+				console.log 'shift inesertion', insertion
+				insertion.start -= cursorRange.length
+
+			newInsertions.push(insertion)
+		@insertions = newInsertions
+
 		newHighlights = []
 		for highlight in @highlights
 			if highlight.range.contains(cursorRange)
@@ -125,7 +145,10 @@ module.exports = class Paragraph extends Section
 
 			newHighlights.push(highlight)
 		@highlights = newHighlights
-		@updateElement()
+
+		if !silent
+			@addChange(@content)
+			@updateElement()
 
 	setCursorPosition: (pos, len = 0) ->
 		range = document.createRange()
@@ -140,22 +163,40 @@ module.exports = class Paragraph extends Section
 		selection.removeAllRanges()
 		selection.addRange(range)
 
-	calcTrackChanges: (changes) ->
-		changeList = [].concat(changes, [{value:@content}])
+	trackChangesOn: () -> @previousVersions? and @previousVersions.length
+
+
+	setChangeSet: (changes) ->
+		@previousVersions = [].concat(changes, [{value:@content}])
+		@calcTrackChanges()
+		console.log([].concat(@previousVersions).map (i) -> i.value)
+
+	addChange: (val) ->
+		@previousVersions = [] if !@previousVersions?
+		@previousVersions.push
+			value: val
+		@calcTrackChanges()
+		console.log([].concat(@previousVersions).map (i) -> i.value)
+
+	calcTrackChanges: () ->
+		if !@trackChangesOn()
+			return
+
+		changeList = @previousVersions#[].concat(@previousVersions, [{value:@content}])
+
 		tempPara = new Paragraph(changeList[0].value);
-		console.log(changeList)
 		for i in [1...changeList.length]
 			diff = StringUtils.diff(tempPara.content, changeList[i].value)
 			index = 0
 			for change in diff
 				if change.added
-					tempPara.insert(index, change.value)
+					tempPara.insert(index, change.value, 0, true)
 					tempPara.applyHighlight(new Range(index, change.value.length), "addition")
 					index+=change.value.length
 				if change.removed
-					tempPara.delete(index, change.value.length)
+					tempPara.delete(index, change.value.length, true)
 					tempPara.addInsertion(index, "delete", value: change.value)
-					index-=change.value.length;
+					#index-=change.value.length;
 				if !change.removed and !change.added
 					index+=change.value.length;
 
@@ -163,12 +204,17 @@ module.exports = class Paragraph extends Section
 		@insertions = @insertions.concat(tempPara.insertions)
 		@highlights = @highlights.filter (highlight) -> !(highlight instanceof Addition)
 		@highlights = @highlights.concat(tempPara.highlights)
+
 		@updateElement()
 
 	addInsertion: (start, name, options) ->
+		console.log('!',start)
 		deletion = new Deletion(@, start)
 		deletion.value = options?.value || ''
-		@insertions.push(deletion)
+		insertAt = 0
+		@insertions.forEach (insertion, index) ->
+			insertAt = index if insertion.start < deletion.start
+		@insertions.splice(insertAt, 0, deletion)
 
 	applyHighlight: (range, name) ->
 		highlight = HighlightManager.availableHighlights[name]
@@ -233,7 +279,7 @@ module.exports = class Paragraph extends Section
 				openHighlights = []
 				for char, i in text
 
-					for insertion in orderedInsertions
+					for insertion in @insertions
 						if insertion.range.start is i
 							buffer += insertion.render()
 						else if insertion.range.start > i
