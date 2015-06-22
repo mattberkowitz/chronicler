@@ -27,16 +27,35 @@
 			}
 
 		</style>
+		<script src="dist/chronicler.js"></script>
 	</head>
 	<body>
 		<input id="test" value="<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>" />
-		<script src="dist/chronicler.js"></script>
+
 		<script>
 			window.editor = new Chronicler.Editor(document.getElementById('test'))
 			window.editor.sections[0].setChangeSet([
 				{value:"ipsum dolor sit amet, something"},
 				{value:"Lorem ipsum dolor sit amet"},
 				{value:'Lorem ipsum dolor sit amet, consectetur adipiscing elit.'}
+			])
+		</script>
+
+
+		<input id="test2" value="<p>This is a test</p>" />
+		<script>
+			window.editor = new Chronicler.Editor(document.getElementById('test2'))
+			window.editor.sections[0].setChangeSet([
+				{value:"is"},
+				{value:"Tis"},
+				{value:"This"},
+				{value:"Thiis"},
+				{value:"Thisis"},
+				{value:"This is"},
+				{value:"This is "},
+				{value:"This is a"},
+				{value:"This is a "},
+				{value:"This is a test"}
 			])
 		</script>
 	</body>
